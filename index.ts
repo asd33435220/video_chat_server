@@ -1,5 +1,5 @@
 import * as WSocket from "ws";
-const wsMap = new Map<string, any>()
+const wsMap = new Map<string, WSocket.WebSocket>()
 const fnMap = new Map<string, Function>()
 const wss = new WSocket.Server({ port: 8010 })
 interface baseOption {
@@ -60,7 +60,7 @@ wss.on('connection', (ws: WSocket.WebSocket, request) => {
                     if (!wsMap.has(liveRoom)) {
                         sendData(ws, { event, data: '不存在的直播间', code, callId })
                     } else {
-                        const liveWs = wsMap.get(liveRoom)
+                        const liveWs = wsMap.get(liveRoom) as WSocket.WebSocket
                         const answer = await getResponse(liveWs, { code: liveRoom, event: 'offer2answer', data: offer })
                         sendData(ws, { code, callId, data: answer, event })
                     }
@@ -72,7 +72,7 @@ wss.on('connection', (ws: WSocket.WebSocket, request) => {
                     if (!wsMap.has(liveRoom)) {
                         sendData(ws, { event, data: '不存在的直播间', code, callId })
                     } else {
-                        const liveWs = wsMap.get(liveRoom)
+                        const liveWs = wsMap.get(liveRoom) as WSocket.WebSocket
                         sendData(liveWs, { code: liveRoom, event: 'audienceCandidate', data: candidate })
                     }
                 }
