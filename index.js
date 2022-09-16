@@ -1,3 +1,4 @@
+"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -34,31 +35,36 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var _this = this;
-var WSocket = require('ws');
+exports.__esModule = true;
+var WSocket = require("ws");
 var wsMap = new Map();
 var fnMap = new Map();
 var wss = new WSocket.Server({ port: 8010 });
+var closeTimeout = function (ws) {
+    setTimeout(function () {
+        ws.terminate();
+    }, 10 * 60 * 1000);
+};
+var sendData = function (ws, option) {
+    ws.send(JSON.stringify(option));
+};
+var getResponse = function (ws, option) {
+    return new Promise(function (resolve) {
+        setTimeout(function () {
+            resolve('timeout');
+        }, 1000);
+        option.callbackId = Math.random().toString(36);
+        fnMap.set(option.callbackId, function (data) {
+            resolve(data);
+        });
+        sendData(ws, option);
+    });
+};
 wss.on('connection', function (ws, request) {
     var code = String(Math.floor(Math.random() * (999999 - 100000)) + 100000);
     console.log("new connection room code: ".concat(code));
     wsMap.set(code, ws);
-    ws.sendData = function (option) {
-        ws.send(JSON.stringify(option));
-    };
-    ws.getResponse = function (option) {
-        return new Promise(function (resolve) {
-            setTimeout(function () {
-                resolve('timeout');
-            }, 1000);
-            option.callbackId = Math.random().toString(36);
-            fnMap.set(option.callbackId, function (data) {
-                resolve(data);
-            });
-            ws.sendData(option);
-        });
-    };
-    ws.on('message', function (message) { return __awaiter(_this, void 0, void 0, function () {
+    ws.on('message', function (message) { return __awaiter(void 0, void 0, void 0, function () {
         var parsedMessage, event, data, callbackId, callId, fn, _a, offer, liveRoom, liveWs, answer, candidate, liveRoom, liveWs;
         return __generator(this, function (_b) {
             switch (_b.label) {
@@ -74,6 +80,7 @@ wss.on('connection', function (ws, request) {
                     if (callbackId && fnMap.has(callbackId)) {
                         fn = fnMap.get(callbackId);
                         fn(data);
+                        fnMap["delete"](callbackId);
                     }
                     _a = event;
                     switch (_a) {
@@ -83,30 +90,30 @@ wss.on('connection', function (ws, request) {
                     }
                     return [3 /*break*/, 7];
                 case 1:
-                    ws.sendData({ event: event, data: code, code: code, callId: callId });
+                    sendData(ws, { event: event, data: code, code: code, callId: callId });
                     return [3 /*break*/, 8];
                 case 2:
                     offer = data.offer, liveRoom = data.code;
                     if (!!wsMap.has(liveRoom)) return [3 /*break*/, 3];
-                    ws.sendData({ event: event, data: '不存在的直播间', code: code, callId: callId });
+                    sendData(ws, { event: event, data: '不存在的直播间', code: code, callId: callId });
                     return [3 /*break*/, 5];
                 case 3:
                     liveWs = wsMap.get(liveRoom);
-                    return [4 /*yield*/, liveWs.getResponse({ code: liveRoom, event: 'offer2answer', data: offer })];
+                    return [4 /*yield*/, getResponse(liveWs, { code: liveRoom, event: 'offer2answer', data: offer })];
                 case 4:
                     answer = _b.sent();
-                    ws.sendData({ code: code, callId: callId, data: answer, event: event });
+                    sendData(ws, { code: code, callId: callId, data: answer, event: event });
                     _b.label = 5;
                 case 5: return [3 /*break*/, 8];
                 case 6:
                     {
                         candidate = data.candidate, liveRoom = data.code;
                         if (!wsMap.has(liveRoom)) {
-                            ws.sendData({ event: event, data: '不存在的直播间', code: code, callId: callId });
+                            sendData(ws, { event: event, data: '不存在的直播间', code: code, callId: callId });
                         }
                         else {
                             liveWs = wsMap.get(liveRoom);
-                            liveWs.sendData({ code: liveRoom, event: 'audienceCandidate', data: candidate });
+                            sendData(liveWs, { code: liveRoom, event: 'audienceCandidate', data: candidate });
                         }
                     }
                     _b.label = 7;
@@ -115,13 +122,8 @@ wss.on('connection', function (ws, request) {
             }
         });
     }); });
-    ws._closeTimeout = function () {
-        setTimeout(function () {
-            ws.terminate();
-        }, 10 * 60 * 1000);
-    };
     ws.on('close', function () {
         wsMap["delete"](code);
-        ws._closeTimeout();
+        closeTimeout(ws);
     });
 });
